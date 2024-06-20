@@ -4,6 +4,8 @@ import numpy as np
 from tqdm import tqdm
 from typing import Union
 from enum import StrEnum, auto
+import warnings
+import uuid
 
 from graph import Graph
 from rw_utils import serialize_boolean_array, pickle_obj
@@ -29,6 +31,8 @@ class Simulation:
             alpha_0: Union[int, float] = 0,
             alpha_1: Union[int, float] = 0,
             max_num_iter: int = 50000,
+            end_condition: int = None, # Условие окончания симуляции (0 или 1, None - и то и другое)
+            sim_id: str = None, # id симуляции (используется для расфасофки по папкам)
             **kwargs
     ):
         self.graph = graph
@@ -38,7 +42,11 @@ class Simulation:
         self.beta_0 = beta_0
         self.beta_1 = beta_1
         self.max_num_iter = max_num_iter
+        self.end_condition = end_condition
 
+        if (end_condition is None and alpha_0 == 0):
+            warnings.warn("There is a chance that simulation will not terminate. If end_condition is not None, alpha_0 should be more than 0", category=RuntimeWarning)
+        
         # auxiliary/convenience variables
         self.nums_neighbors = self.graph.adj_matrix @ np.ones(shape=self.graph.num_nodes, dtype=np.float32)
         self.delta_0 = self.beta_0 - self.alpha_0
@@ -83,7 +91,8 @@ class Simulation:
         self.states = np.logical_xor(self.states, self.transitions)  # performs state transitions
 
     def is_completed(self):
-        if np.all(self.states == self.states[0]):
+        condition = self.end_condition if self.end_condition is not None else self.states[0]
+        if np.all(self.states == condition):
             self.completed = True
             return True
 
@@ -133,7 +142,6 @@ class LinearMixin:
             self.beta_1 - self.delta_1 * self.f,
             self.alpha_0 + self.delta_0 * self.f
         )
-
 
 class LongstepMixin:
     func_type: FunctionType = FunctionType.longstep
@@ -213,10 +221,11 @@ class SimulationResults:
 
 
 class SimulationEnsemble:
-    def __init__(self, sim: Simulation, num_runs: int = 100):
+    def __init__(self, sim: Simulation, num_runs: int = 100, sim_pack_id: uuid.UUID | str = None):
         sim.setup(light=True)
         self.sim = sim
         self.num_runs = num_runs
+        self.sim_pack_id = sim_pack_id
 
     @staticmethod
     def get_dir_name(sim: Simulation, timestamp: bool = True):
@@ -232,7 +241,9 @@ class SimulationEnsemble:
 
     def run(self):
         fmt_str = f'0{digits(self.num_runs - 1)}d'  # format for the number of binary file
-        path = os.path.join(OUTPUT_PATH, self.get_dir_name(self.sim))
+        path = os.path.join(f"{OUTPUT_PATH}{'\\' + str(self.sim_pack_id) if self.sim_pack_id is not None else ''}"
+                            , self.get_dir_name(self.sim))
+        
         pickle_obj(self.sim, filename=PARAM_FILENAME, path=path)
         pbar = tqdm(range(self.num_runs), leave=True, colour='green')
         for i in pbar:

@@ -1,5 +1,10 @@
 import math
 import numpy as np
+import shutil
+import os
+import re
+
+from config import PARAM_FILENAME, RESULT_FILENAME_PATTERN, OUTPUT_PATH
 from typing import List, Union
 
 
@@ -82,3 +87,68 @@ def digits(num: Union[int, float]):
         return 1
     else:
         return math.floor(math.log10(num)) + 1
+
+''' Author: Aksenov IV
+Функция для слияния нескольких симуляций из разных папок
+Если есть несколько ранов, в которых по несколько симуляций, эта
+функция их объединит в общие папки
+'''
+def merge_sim(cur_paths: List[str], type_path: str, outpath: str = OUTPUT_PATH):
+    out_dir = outpath + "\\merge"
+
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
+    
+    if len(cur_paths) == 0:
+        raise NotImplementedError("Empty paths!!!")
+    
+    for cur_path in cur_paths:
+        all_paths = [
+            cur_path + "\\" + run_path + "\\" + exp_path + "\\" + edge_path + "\\" + graph_path + "\\" + sim_path
+            for run_path in os.listdir(cur_path)
+            if run_path != "merged"
+            for exp_path in os.listdir(cur_path + "\\" + run_path)
+            for edge_path in os.listdir(cur_path + "\\" + run_path + "\\" + exp_path)
+            for graph_path in os.listdir(cur_path + "\\" + run_path + "\\" + exp_path + "\\" + edge_path)
+            for sim_path in os.listdir(cur_path + "\\" + run_path + "\\" + exp_path + "\\" + edge_path + "\\" + graph_path)
+        ]
+
+    suitable_paths = [
+        path 
+        for path in all_paths
+        if (type_path in path)
+    ]
+
+    divided_path = type_path.split('\\')[:-1]
+    print(divided_path)
+    
+    for i, path in enumerate(divided_path):
+        out_dir += "\\" + path
+        if not os.path.isdir(out_dir):
+            print(out_dir)
+            os.mkdir(out_dir)
+    
+    size = 0
+    for path in suitable_paths:
+        for fname in os.listdir(path):
+            if re.match(RESULT_FILENAME_PATTERN, fname):
+                size += 1
+    
+    
+    fmt_str = f'0{digits(size - 1)}d'
+    
+    
+    cnt = 0
+    for path in suitable_paths:
+        sim_fname = '_'.join(path.split('\\')[-1].split("_")[2:])
+        if not os.path.isdir(out_dir + "\\" + sim_fname):
+            os.mkdir(out_dir + "\\" + sim_fname)
+            shutil.copyfile(suitable_paths[0] + "\\" + PARAM_FILENAME, out_dir + "\\" + sim_fname + "\\" + PARAM_FILENAME)  
+        fnames = [
+            fname
+            for fname in os.listdir(path)
+            if re.match(RESULT_FILENAME_PATTERN, fname)
+        ]
+        for fname in fnames:
+            shutil.copyfile(path + '\\' + fname, out_dir + '\\' + sim_fname + '\\' + f"{cnt:{fmt_str}}" + ".pickle")
+            cnt += 1

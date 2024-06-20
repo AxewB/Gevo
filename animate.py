@@ -68,7 +68,9 @@ def create_gif(
 
     imageio.mimsave(filepath, images, fps=fps)
 
-
+''' AksenovIV:
+Немного изменил, чтобы можно было использовать разные layout для разных графов
+'''
 def figures_to_images(fig_list):
     images = []
     pbar = tqdm(fig_list, position=0, leave=True)
@@ -96,7 +98,9 @@ def plot_graph_figures(
     else:
         t_end = min(sr.t, t_end)
 
-    layout = nx.circular_layout(sim.graph.graph) if sim.graph.graph_type == GraphType.ring else nx.kamada_kawai_layout(sim.graph.graph)
+    # Берем layout из графа в симуляции
+    layout = sim.graph.layout
+    
     colors = np.where(
         deserialize_boolean_array(sr.state_history, shape=(sr.t, sim.graph.num_nodes)),
         color_1,
