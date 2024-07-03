@@ -120,7 +120,6 @@ def merge_sim(cur_paths: List[str], type_path: str, outpath: str = OUTPUT_PATH):
     ]
 
     divided_path = type_path.split('\\')[:-1]
-    print(divided_path)
     
     for i, path in enumerate(divided_path):
         out_dir += "\\" + path
